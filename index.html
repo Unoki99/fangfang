@@ -169,6 +169,7 @@ button:focus-visible, .w:focus-visible { outline: 2px solid var(--glyph); outlin
 .rh { font-family: var(--f-han); font-size: 1.5rem; font-weight: 500; color: var(--blue-ink); }
 .rl { font-family: var(--f-lat); font-size: 1.15rem; color: var(--green-ink); }
 .rz { font-family: var(--f-han); font-size: 1rem; color: var(--purple-ink); }
+.rtop .reg { align-self: center; margin-left: 0; font-size: .75rem; padding: 3px 6px; }
 .rg { display: flex; flex-wrap: wrap; gap: 6px; }
 .rg span { font-family: var(--f-han); font-size: .9rem; padding: 1px 9px; border-radius: 999px; background: rgba(0,0,0,.25); color: var(--glyph); }
 .rg span.ex { opacity: .75; }
@@ -925,7 +926,9 @@ function resultCard(it, q) {
   const a = document.createElement("span"); a.className = "rh"; a.textContent = han;
   const b = document.createElement("span"); b.className = "rl"; b.textContent = codes.map(LAT).join("-");
   const c = document.createElement("span"); c.className = "rz"; c.textContent = codes.map(ZY).join("");
-  top.append(a, b, c); card.append(top);
+  top.append(a, b, c);
+  const chip = regChip(han, codes); if (chip) top.append(chip);
+  card.append(top);
   if (it.def != null) {
     const text = DEFS.t[it.def].replace(/\n/g, " ");
     const at = text.indexOf(q), from = Math.max(0, at - 14), to = Math.min(text.length, at + q.length + 22);
