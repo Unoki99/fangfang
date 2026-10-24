@@ -478,7 +478,7 @@ async function findLayout(roots, file, samples) {
 (async () => {
   wordPath = await findLayout(["audio/"], id => id + "(1).mp3", [[1], [2272]]);
   if (wordPath) { audioOK = true; document.documentElement.classList.add("has-audio"); }
-  exPath = await findLayout(["audio/", "leku/", "audio/leku/", "audio-leku/"], (id, name) => name + ".mp3", [[1, "1-1-1"], [2272, "2272-1-1"]]);
+  exPath = await findLayout(["leku/", "leku-mp3/", "audio/", "audio/leku/", "audio/leku-mp3/", "audio-leku/", "examples/", "sentences/"], (id, name) => name + ".mp3", [[1, "1-1-1"], [2272, "2272-1-1"]]);
   if (exPath) document.documentElement.classList.add("has-ex-audio");
 })();
 function makePlay(src, cls) {
