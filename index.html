@@ -595,7 +595,7 @@ function atomize(text) {
   // Latin text: 皓羅, Tâi-lô or POJ. Auto mode votes with the spellings only one system has.
   const look = {
     lat: a => latRev.get(a.key),
-    tl: a => a.rk && tlRev.get(a.rk),
+    tl: a => a.rk && !/[ⁿ\u0358]/.test(a.text) && tlRev.get(a.rk),   // 台羅 never writes ⁿ or o͘
     poj: a => a.rk && pojRev.get(a.rk),
   };
   const votes = { lat: 0, tl: 0, poj: 0 };
@@ -606,7 +606,7 @@ function atomize(text) {
     const hits = Object.keys(look).filter(k => look[k](a));
     for (const k of hits) votes[k] += 1 / hits.length;
   }
-  const auto = ["lat", "tl", "poj"].reduce((b, k) => (votes[k] > votes[b] + 1e-9 ? k : b), "lat");
+  const auto = ["lat", "tl", "poj"].reduce((b, k) => (votes[k] > votes[b] + 1e-6 ? k : b), "lat");
   const used = latinMode === "auto" ? auto : latinMode;
   lastLatin = { any: anyLatin, auto, used };
   const order = [used, ...["lat", "tl", "poj"].filter(k => k !== used)];
