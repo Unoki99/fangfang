@@ -149,7 +149,7 @@ button:focus-visible, .w:focus-visible { outline: 2px solid var(--glyph); outlin
 .note { font-size: .8rem; color: var(--muted); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .w.unk { cursor: pointer; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tabs { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; }
 .tabs button { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 10px 12px; background: var(--fn); border: 2px solid var(--fn-edge); border-radius: var(--r); color: var(--muted); font-family: var(--f-han); font-size: 1.1rem; font-weight: 700; }
 .tabs button small { font-family: var(--f-ui); font-size: .75rem; font-weight: 700; opacity: .8; }
 .tabs button[aria-selected="true"] { background: var(--key); border-color: var(--key-edge); color: var(--glyph); }
@@ -250,6 +250,20 @@ mark { background: rgba(241,227,174,.22); color: var(--olive-ink); border-radius
 .romsw { display: flex; gap: 3px; background: rgba(0,0,0,.18); border: 2px solid rgba(255,255,255,.14); border-radius: 12px; padding: 2px; }
 .romsw button { background: none; border: 2px solid transparent; border-radius: 9px; padding: 1px 9px; font-family: var(--f-han); font-size: .9rem; font-weight: 700; color: var(--ink); opacity: .7; }
 .romsw button[aria-pressed="true"] { opacity: 1; background: rgba(79,108,50,.55); border-color: var(--green-edge); color: var(--glyph); }
+.star { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; background: rgba(140,122,56,.18); border: 2px solid var(--olive-edge); color: transparent; vertical-align: middle; flex: none; }
+.star svg path { stroke: var(--olive-ink); }
+.star[aria-pressed="true"] { color: var(--olive-ink); background: rgba(140,122,56,.4); }
+.star:hover { background: rgba(140,122,56,.35); }
+.rtop .star { align-self: center; }
+.saved-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.saved-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sbtn { background: var(--key); border: 2px solid var(--key-edge); color: var(--glyph); border-radius: 12px; padding: 4px 12px; font-family: var(--f-han); font-size: .88rem; font-weight: 700; }
+.sbtn small { font-size: inherit; }
+.sbtn:disabled { opacity: .4; cursor: default; }
+.sbtn-go { background: rgba(79,108,50,.28); border-color: var(--green-edge); }
+.sbtn-warn { background: transparent; border-color: var(--fn-edge); color: var(--muted); }
+.sbtn-warn.armed { border-color: var(--red-edge); background: var(--red); color: var(--red-ink); }
+.saved-note { margin: 0; font-size: .8rem; color: var(--muted); font-family: var(--f-han); line-height: 1.6; }
 .reg-own { background: var(--olive); color: var(--olive-ink); border: 1px solid var(--olive-edge); }
 .opt .oh { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
 .opt .oh .reg { margin-left: 0; }
@@ -274,9 +288,25 @@ footer { font-size: .8rem; color: var(--muted); display: flex; flex-wrap: wrap; 
   </header>
 
   <nav class="tabs" role="tablist" aria-label="模式">
-    <button type="button" role="tab" id="tab-conv" data-tab="conv" aria-selected="true">轉換<small>漢字・皓羅・方音</small></button>
+    <button type="button" role="tab" id="tab-conv" data-tab="conv" aria-selected="true">轉換<small>三種寫法</small></button>
     <button type="button" role="tab" id="tab-look" data-tab="look" aria-selected="false">華語 → 台語<small>查台語詞</small></button>
+    <button type="button" role="tab" id="tab-saved" data-tab="saved" aria-selected="false">收藏<small id="saved-count">0 個詞</small></button>
   </nav>
+
+  <section class="look" id="view-saved" hidden>
+    <div class="look-box key">
+      <div class="saved-top">
+        <span class="lab" id="saved-title">收藏的詞</span>
+        <div class="saved-actions">
+          <button type="button" class="sbtn sbtn-go" id="csv-download">下載 CSV</button>
+          <button type="button" class="sbtn" id="csv-copy"><small>複製 CSV</small></button>
+          <button type="button" class="sbtn sbtn-warn" id="saved-clear">全部清除</button>
+        </div>
+      </div>
+      <p class="saved-note">CSV 每個釋義一行，用分號（;）分隔：詞、皓羅、詞性、釋義、例句、例句皓羅、例句華語、詞目音檔、例句音檔。若無法下載，請用「複製 CSV」。</p>
+    </div>
+    <div id="saved-list" class="results"></div>
+  </section>
 
   <section class="look" id="view-look" hidden>
     <div class="look-box key">
@@ -831,9 +861,9 @@ function fillDef(el, key, tag, q = "", cls = "") {
   });
 }
 const EX = DATA.ex || {};
-function romSentence(tpl) {
+function romSentence(tpl, f = ROM) {
   return tpl.replace(/\{(\^?)([^}]+)\}/g, (m, cap, c) => {
-    const s = SYL[c] ? ROM(c) : c;
+    const s = SYL[c] ? f(c) : c;
     return cap ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   });
 }
@@ -857,6 +887,7 @@ function openPick(span) {
     if (mode === "lat" && o.han != null && o.codes) {
       const chip = regChip(o.han, o.codes); if (chip) val.append(" ", chip);
       const pb = playButton(o.han, o.codes); if (pb) val.append(" ", pb);
+      val.append(" ", saveButton(o.han + "\t" + o.codes.join(" ")));
     }
     if (!known) val.classList.add("none");
     row.append(lab, val); card.append(row);
@@ -1104,6 +1135,7 @@ function resultCard(it, q) {
   top.append(a, b, c);
   const chip = regChip(han, codes); if (chip) top.append(chip);
   const pb = playButton(han, codes); if (pb) top.append(pb);
+  top.append(saveButton(it.k));
   card.append(top);
   if (it.def != null) {
     const text = DEFS.t[it.def].replace(/\n/g, " ");
@@ -1153,6 +1185,8 @@ function setTab(name) {
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   document.querySelectorAll(".conv-only").forEach(e => { e.hidden = name !== "conv"; });
   document.getElementById("view-look").hidden = name !== "look";
+  document.getElementById("view-saved").hidden = name !== "saved";
+  if (name === "saved") renderSaved();
   closePick();
   try { localStorage.setItem("ff-tab", name); } catch (e) {}
 }
@@ -1160,6 +1194,86 @@ document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click
   setTab(b.dataset.tab);
   if (b.dataset.tab === "look") document.getElementById("q").focus();
 }));
+
+// ---------- 收藏: saved words, shown as cards and exported as CSV ----------
+let SAVED = [];
+try { SAVED = JSON.parse(localStorage.getItem("ff-saved") || "[]").filter(k => typeof k === "string"); } catch (e) {}
+const isSaved = k => SAVED.includes(k);
+function storeSaved() { try { localStorage.setItem("ff-saved", JSON.stringify(SAVED)); } catch (e) {} updateSavedCount(); }
+function updateSavedCount() { document.getElementById("saved-count").textContent = SAVED.length + " 個詞"; }
+function saveButton(k) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "star";
+  b.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  const sync = () => { const on = isSaved(k); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? "取消收藏" : "加入收藏"); b.title = on ? "取消收藏" : "加入收藏"; };
+  sync();
+  b.addEventListener("click", e => {
+    e.stopPropagation();
+    const i = SAVED.indexOf(k);
+    if (i >= 0) SAVED.splice(i, 1); else SAVED.unshift(k);
+    storeSaved();
+    document.querySelectorAll(".star").forEach(x => x.dispatchEvent(new CustomEvent("sync")));
+    if (!document.getElementById("view-saved").hidden && i >= 0) renderSaved();
+  });
+  b.addEventListener("sync", sync);
+  b.dataset.key = k;
+  return b;
+}
+function renderSaved() {
+  const box = document.getElementById("saved-list");
+  box.textContent = "";
+  const keys = SAVED.filter(k => hanMap.has(k.split("\t")[0]));
+  document.getElementById("saved-title").textContent = "收藏的詞（" + keys.length + "）";
+  ["csv-download", "csv-copy", "saved-clear"].forEach(id => { document.getElementById(id).disabled = !keys.length; });
+  if (!keys.length) {
+    const e = document.createElement("div"); e.className = "rempty";
+    e.textContent = "還沒有收藏。點詞語旁邊的 ☆，就會加到這裡。";
+    box.append(e); return;
+  }
+  for (const k of keys) box.append(resultCard({ k }, ""));
+}
+const csvCell = v => (/[;"\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+function savedCSV() {
+  const rows = [];
+  for (const k of SAVED) {
+    const [h, c] = k.split("\t");
+    if (!c) continue;
+    const codes = c.split(" ").filter(x => SYL[x]);
+    const hl = codes.map(LAT).join("-");
+    const wa = AU[k] != null ? AU[k] + "(1)" : "";
+    const di = DEFS ? DEFS.m[k] : undefined;
+    if (di === undefined) { rows.push([h, hl, "", "", "", "", "", wa, ""]); continue; }
+    const pos = (POS[k] || "").split("|");
+    DEFS.t[di].split("\n").forEach((line, i) => {
+      const ex = EX[k] && EX[k][i] && EX[k][i][0];
+      rows.push([h, hl, pos[i] || "", line.replace(/^\d+\.\s*/, ""),
+        ex ? ex[0] : "", ex ? romSentence(ex[1], LAT) : "", ex ? ex[2] : "", wa, ex ? ex[3] : ""]);
+    });
+  }
+  return rows.map(r => r.map(csvCell).join(";")).join("\n") + "\n";
+}
+document.getElementById("csv-download").addEventListener("click", () => {
+  const blob = new Blob(["\ufeff" + savedCSV()], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const d = new Date();
+  a.download = "台語收藏-" + d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0") + ".csv";
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+document.getElementById("csv-copy").addEventListener("click", e => copyText(savedCSV(), e.currentTarget, "csv"));
+const clearBtn = document.getElementById("saved-clear");
+let clearArmed = 0;
+clearBtn.addEventListener("click", () => {
+  if (!clearArmed) {
+    clearBtn.textContent = "確定清除？"; clearBtn.classList.add("armed");
+    clearArmed = setTimeout(() => { clearArmed = 0; clearBtn.textContent = "全部清除"; clearBtn.classList.remove("armed"); }, 3000);
+    return;
+  }
+  clearTimeout(clearArmed); clearArmed = 0; clearBtn.textContent = "全部清除"; clearBtn.classList.remove("armed");
+  SAVED = []; storeSaved(); renderSaved();
+});
+updateSavedCount();
 
 // ---------- romanization switch ----------
 function updateRomUI() {
@@ -1249,7 +1363,7 @@ let start = EXAMPLE_HAN;
 try { const d = localStorage.getItem("ff-draft"); if (d) start = d; } catch (e) {}
 src.value = start;
 run();
-try { if (localStorage.getItem("ff-tab") === "look") setTab("look"); } catch (e) {}
+try { const tab = localStorage.getItem("ff-tab"); if (tab === "look" || tab === "saved") setTab(tab); } catch (e) {}
 window.__ff = { allText, convert, plain, render, getState: () => state, setState: s => { state = s; render(); } };
 })();
 </script>
