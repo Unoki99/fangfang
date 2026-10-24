@@ -432,13 +432,32 @@ for (const [h, list] of hanMap) {
 }
 // ---------- audio: MOE recordings in an "audio" folder next to the page, named {entry id}(1).mp3 ----------
 const AU = DATA.au || {};
-let audioOK = false;
+let audioOK = false, audioPath = null;
 const player = new Audio();
-(() => {                                      // probe once: show ▶ buttons only where the files exist
-  const probe = new Audio();
-  probe.preload = "metadata";
-  probe.addEventListener("loadedmetadata", () => { audioOK = true; document.documentElement.classList.add("has-audio"); });
-  probe.src = "audio/" + encodeURIComponent("1(1)") + ".mp3";
+// the recordings may sit directly in audio/ or in numbered sub-folders; try the likely layouts
+const AUDIO_LAYOUTS = [
+  id => "audio/" + id + "(1).mp3",
+  id => "audio/" + id + "/" + id + "(1).mp3",
+  id => "audio/" + Math.floor(id / 1000) + "/" + id + "(1).mp3",
+  id => "audio/" + (Math.floor((id - 1) / 1000) + 1) + "/" + id + "(1).mp3",
+  id => "audio/" + Math.floor(id / 100) + "/" + id + "(1).mp3",
+  id => "audio/" + (Math.floor((id - 1) / 100) + 1) + "/" + id + "(1).mp3",
+  id => "audio/" + Math.floor(id / 10000) + "/" + id + "(1).mp3",
+  id => "audio/" + (Math.floor((id - 1) / 10000) + 1) + "/" + id + "(1).mp3",
+];
+const enc = p => p.split("/").map(encodeURIComponent).join("/");
+const canLoad = src => new Promise(res => {
+  const a = new Audio(); a.preload = "metadata";
+  const done = ok => { a.removeAttribute("src"); res(ok); };
+  a.addEventListener("loadedmetadata", () => done(true), { once: true });
+  a.addEventListener("error", () => done(false), { once: true });
+  setTimeout(() => done(false), 8000);
+  a.src = enc(src);
+});
+(async () => {
+  const results = await Promise.all(AUDIO_LAYOUTS.map(async f => (await canLoad(f(1))) && (await canLoad(f(2272)))));
+  const k = results.indexOf(true);
+  if (k >= 0) { audioPath = AUDIO_LAYOUTS[k]; audioOK = true; document.documentElement.classList.add("has-audio"); }
 })();
 function playButton(h, codes) {
   const id = AU[h + "\t" + codes.join(" ")];
@@ -449,7 +468,8 @@ function playButton(h, codes) {
   b.addEventListener("click", e => {
     e.stopPropagation();
     player.pause();
-    player.src = "audio/" + encodeURIComponent(id + "(1)") + ".mp3";
+    if (!audioPath) return;
+    player.src = enc(audioPath(id));
     document.querySelectorAll(".play.on").forEach(x => x.classList.remove("on"));
     b.classList.add("on");
     player.onended = player.onerror = () => b.classList.remove("on");
