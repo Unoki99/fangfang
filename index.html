@@ -194,6 +194,12 @@ mark { background: rgba(241,227,174,.22); color: var(--olive-ink); border-radius
 .w { cursor: pointer; }
 .w:hover { background: rgba(0,0,0,.2); }
 .w.active { background: rgba(255,255,255,.16); box-shadow: 0 0 0 2px rgba(255,255,255,.28); }
+.phead { display: flex; align-items: flex-start; gap: 8px; }
+.phead .pcard { flex: 1; min-width: 0; }
+.pview { flex: none; display: flex; flex-direction: column; gap: 4px; margin: 6px 4px 0 0; background: rgba(0,0,0,.18); border: 2px solid var(--fn-edge); border-radius: 12px; padding: 3px; }
+.pview button { background: none; border: 2px solid transparent; border-radius: 9px; padding: 3px 10px; font-family: var(--f-han); font-size: .85rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.pview button[aria-pressed="true"] { background: var(--key); border-color: var(--key-edge); color: var(--glyph); }
+.palt { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; border-top: 2px solid var(--fn-edge); margin-top: 2px; }
 .pcard { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 8px; }
 .prow { display: grid; grid-template-columns: 2.6em 1fr; align-items: baseline; gap: 10px; }
 .plab { font-family: var(--f-han); font-size: .75rem; color: var(--muted); }
@@ -790,7 +796,7 @@ function remember(it) {
 
 // ---------- picking alternatives ----------
 const pick = document.getElementById("pick");
-let pickFor = null;
+let pickFor = null, pickView = "def";
 const DEFS = DATA.defs || null;
 const POS = DATA.pos || {};
 // one meaning per line: number, word class, text (with an optional highlighted search word)
@@ -855,13 +861,16 @@ function openPick(span) {
     if (!known) val.classList.add("none");
     row.append(lab, val); card.append(row);
   }
-  pick.append(card);
+  const head = document.createElement("div"); head.className = "phead";
+  head.append(card);
+  pick.append(head);
+  const views = {};
   const def = DEFS && o.han != null && o.codes ? DEFS.m[o.han + "\t" + o.codes.join(" ")] : undefined;
   if (def !== undefined) {
     const box = document.createElement("div");
     box.className = "pdef";
     fillDef(box, o.han + "\t" + o.codes.join(" "), "p");
-    pick.append(box);
+    views.def = box;
   }
   if (o.han == null || !o.codes) {
     const add = document.createElement("button");
@@ -871,10 +880,7 @@ function openPick(span) {
     pick.append(add);
   }
   if (it.opts.length > 1) {
-    const head = document.createElement("div");
-    head.className = "ph";
-    head.textContent = it.src === "han" ? "其他讀音" : "其他漢字";
-    pick.append(head);
+    const list = document.createElement("div"); list.className = "palt";
     it.opts.forEach((op, k) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "opt" + (k === it.sel ? " sel" : "");
@@ -893,9 +899,30 @@ function openPick(span) {
         b.append(od); b.classList.add("has-def");
       }
       b.addEventListener("click", () => { it.sel = k; remember(it); closePick(); render(); });
-      pick.append(b);
+      list.append(b);
     });
+    views.alt = list;
   }
+  const altName = (it.src === "han" ? "讀音 " : "漢字 ") + it.opts.length;
+  for (const v of Object.values(views)) pick.append(v);
+  const show = name => {
+    pickView = name;
+    for (const [k, v] of Object.entries(views)) v.hidden = k !== name;
+    head.querySelectorAll(".pview button").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.view === name)));
+  };
+  if (views.def && views.alt) {
+    const sw = document.createElement("div"); sw.className = "pview"; sw.setAttribute("role", "group"); sw.setAttribute("aria-label", "顯示");
+    for (const [k, label] of [["def", "釋義"], ["alt", altName]]) {
+      const x = document.createElement("button"); x.type = "button"; x.dataset.view = k; x.textContent = label;
+      x.addEventListener("click", e => { e.stopPropagation(); show(k); });
+      sw.append(x);
+    }
+    head.append(sw);
+  } else if (views.alt) {
+    const lab = document.createElement("div"); lab.className = "ph"; lab.textContent = it.src === "han" ? "其他讀音" : "其他漢字";
+    pick.insertBefore(lab, views.alt);
+  }
+  show(views[pickView] ? pickView : views.def ? "def" : "alt");
   document.querySelectorAll(".w.active").forEach(e => e.classList.remove("active"));
   document.querySelectorAll('.w[data-i="' + pickFor + '"]').forEach(e => e.classList.add("active"));
   pick.hidden = false;
